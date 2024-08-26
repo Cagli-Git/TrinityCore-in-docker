@@ -27,7 +27,7 @@ And you're good to go.
 
 ## 1. Compile
 
-1. Copy your WoW 1.12 client files directly into `./compiler/wow` so you have `./compiler/wow/Wow.exe` and `./compile_wow_classic/wow/Data/` and all of the rest of the files + directories in there.
+1. Copy your WoW 3.3.5a / 3.3.5.12340 client files directly into `./compiler/wow` so you have `./compiler/wow/Wow.exe` and `./compiler/wow/Data/` and all of the rest of the files + directories in there.
 2. On the command line run:
     - `cd <whatever folder you place this repo in>/compiler`
     - `docker compose up`
