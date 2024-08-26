@@ -1,0 +1,13 @@
+services:
+    trinity_compile:
+        build: .
+        container_name: trinity_compiler335
+        volumes:
+        - ../server/data:/server-compiled
+#         networks:
+#           - wowcompiler
+
+# networks:
+#     wowcompiler:
+#         name: wowtrinity335
+#         # external: true

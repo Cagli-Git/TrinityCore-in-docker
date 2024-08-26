@@ -1,0 +1,139 @@
+
+
+# docker compose up
+
+# clean it all up:
+# docker container rm trinity335db; docker volume rm db_wow_classic_mysql-datavolume; docker compose up
+
+services:
+    db:
+        image: mysql:9.0.1
+        container_name: trinity335db
+        entrypoint: ["/bin/sh","-c"]
+        ports:
+            - 3306:3306
+        command:
+        - |
+            export FIRST_RUN="false"
+            export PWD=`pwd`
+
+            echo "Checking if path /var/lib/mysql/trinity exists"
+            if [ ! -d /var/lib/mysql/trinity ]; then
+                echo "SQL Import not found. The first launch could take a long time. Be patient"
+                export FIRST_RUN="true"
+                # rm -rf /docker-entrypoint-initdb.d/*
+
+                echo "Grabbing and extracting $$TRINITY_REPO_URL"
+                curl -L --silent --output /tmp/master.tar.gz $$TRINITY_REPO_URL
+                cd /tmp
+                tar -xf /tmp/master.tar.gz
+                rm -rf /tmp/master.tar.gz
+
+                # =============== 1. sql/create/create_mysql.sql
+                # https://github.com/TrinityCore/TrinityCore/blob/3.3.5/sql/create/create_mysql.sql # 3.3.5:
+
+                # Skip create user
+                sed -i 's/CREATE USER /-- CREATE USER /g' "$${TRINITY_CORE_DIR}/sql/create/create_mysql.sql"
+                # Skip GRANT
+                sed -i 's/GRANT USAGE ON/-- GRANT USAGE ON/g' "$${TRINITY_CORE_DIR}/sql/create/create_mysql.sql"
+                # localhost should be %
+                sed -i 's/localhost/%/g' "$${TRINITY_CORE_DIR}/sql/create/create_mysql.sql"
+
+                mv "$${TRINITY_CORE_DIR}/sql/create/create_mysql.sql" /docker-entrypoint-initdb.d/01-create_mysql.sql
+
+                # =============== 2. Full world DB
+                # Too bad it's not really possible to generate a full TDB_full_world.sql file from scratch. You'll have to rely on releases
+
+                # We need 7zip for it (sigh)
+                mkdir -p /tmp/7z
+                curl -L --silent --output /tmp/7z/7z.tar.gz https://7-zip.org/a/7z2408-linux-x64.tar.xz
+                cd /tmp/7z
+                tar -xf /tmp/7z/7z.tar.gz
+                mv /tmp/7z/7zz /tmp/7z/7zzs /usr/bin
+                rm -rf  /tmp/7z
+                cd /
+
+                echo "Grabbing and extracting https://github.com/TrinityCore/TrinityCore/releases/download/$${TRINITY_FULL_DB_VERSION}.7z"
+                curl -L --silent --output /tmp/TDB.7z https://github.com/TrinityCore/TrinityCore/releases/download/$${TRINITY_FULL_DB_VERSION}.7z
+                cd /tmp
+                /usr/bin/7zz e TDB.7z
+                rm -rf TDB.7z
+                for FILE in $$(find /tmp -type f -name 'TDB_full_world_*.sql'); do
+                    BASENAME=$$(basename $$FILE)
+
+                    # Add "use `world` on top of the file"
+                    sed -i '1s/^/USE `world`;\n\n/' "$$FILE"
+
+                    echo "Moving $$FILE to /docker-entrypoint-initdb.d/02-$${BASENAME}"
+                    mv "$$FILE" "/docker-entrypoint-initdb.d/02-$${BASENAME}"
+                done
+
+                # =============== 3. sql/base/auth_database.sql
+                mv "$${TRINITY_CORE_DIR}/sql/base/auth_database.sql" /docker-entrypoint-initdb.d/03-auth_database.sql
+                sed -i '1s/^/USE `auth`;\n\n/' /docker-entrypoint-initdb.d/03-auth_database.sql
+                AUTH_DB=$$(cat /docker-entrypoint-initdb.d/03-auth_database.sql)
+
+                # =============== 4. sql/base/characters_database.sql
+                mv "$${TRINITY_CORE_DIR}/sql/base/characters_database.sql" /docker-entrypoint-initdb.d/04-characters_database.sql
+                sed -i '1s/^/USE `characters`;\n\n/' /docker-entrypoint-initdb.d/04-characters_database.sql
+                CHAR_DB=$$(cat /docker-entrypoint-initdb.d/04-characters_database.sql)
+
+                # =============== 5. Set Administrator account for GM Console (remote)
+                echo -e "use \`auth\`\n" > /docker-entrypoint-initdb.d/05-insert-administrator.sql
+                echo "INSERT INTO \`account\` VALUES (1,'ADMINISTRATOR',0x171EAC0EB095508C3734D480C9048022F0600925344F112FF7256C2CA1FAEFA5,0x5AD77E43D5C0E3D60D193AB793DE5AE7BC0B771DB50670424996945F0AC35353,NULL,NULL,NULL,'','','2024-08-26 12:35:07','127.0.0.1','127.0.0.1',0,0,'00',NULL,0,2,0,'','',0,'',0,0);" >> /docker-entrypoint-initdb.d/05-insert-administrator.sql
+
+                # ============== Clean up
+
+                chmod 0755 /docker-entrypoint-initdb.d/
+                chown -R mysql:mysql /docker-entrypoint-initdb.d/*
+
+                rm -rf "$${TRINITY_CORE_DIR}"
+
+                echo "Done!"
+            fi
+
+            # Master:
+            # https://github.com/TrinityCore/TrinityCore/blob/master/sql/create/create_mysql.sql
+
+            # sleep infinity
+            echo "Starting MySQL...."
+            docker-entrypoint.sh mysqld --innodb-buffer-pool-size=200M --innodb_buffer_pool_instances=2 --innodb_lock_wait_timeout=600 --pid-file /var/lib/mysql/mysqld.pid
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: trinity
+            MYSQL_USER: trinity
+            MYSQL_PASSWORD: trinity
+            TRINITY_REPO_URL: "https://github.com/TrinityCore/TrinityCore/archive/refs/heads/3.3.5.tar.gz"
+            TRINITY_FULL_DB_VERSION: "TDB335.24081/TDB_full_world_335.24081_2024_08_17"
+            TRINITY_CORE_DIR: "/tmp/TrinityCore-3.3.5"
+            # show variables like 'default_authentication_plugin';
+
+        volumes:
+            # ==== Volume files can be found in either:
+            # /var/lib/docker/volumes (Linux)
+            # \\wsl$\docker-desktop\mnt\docker-desktop-disk\data\docker\volumes (WSL Windows)
+            # or:
+            # \\wsl.localhost\docker-desktop-data\version-pack-data\community\docker\volumes
+            # or if you have a Synology NAS:
+            # /volume1/@docker/volumes
+            # And then the project name + volume name, example: /var/lib/docker/volumes/trinity335-datavolume/_data
+            # To delete it, run `docker volume rm trinity335-datavolume`
+            - trinity335-datavolume:/var/lib/mysql
+            # Scripts are downloaded in here. Place sql scripts in here if you want them executed during the first ever startup
+            - ./run-scripts:/docker-entrypoint-initdb.d/:rw
+        healthcheck:
+            test: mysqladmin ping -h 127.0.0.1 -utrinity --password=trinity
+            start_period: 5s
+            interval: 5s
+            timeout: 5s
+            retries: 30
+        networks:
+            - trinity335db_network
+
+networks:
+    trinity335db_network:
+        # driver: bridge
+        name: trinity335
+
+volumes:
+    trinity335-datavolume:

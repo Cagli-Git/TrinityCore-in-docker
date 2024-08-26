@@ -1,0 +1,43 @@
+services:
+    trinity335_authserver:
+        build: .
+        image: trinity_authserver:6b42708
+        container_name: trinity335_authserver
+        command: nohup ./authserver > authserver.out 2>&1 &
+        ports:
+            # Authserver / Realmd port
+            - 3724:3724
+        volumes:
+        - ./data:/server/
+        networks:
+            - trinity335db_network
+
+    trinity335_worldserver:
+        build: .
+        container_name: trinity335_worldserver
+        image: trinity335_worldserver:6b42708
+        command: nohup ./worldserver
+        ports:
+            # WorldServer port
+            - 8085:8085
+            # Remote Admin Console
+            # Connect to this pod (localhost if you're running it locally) to port 3443, log in with your account (or admin)
+            # Use Putty with RAW option to log in.
+            # Default Admin:
+            # username: administrator
+            # password: administrator
+            # Commands: https://trinitycore.info/how-to/gm-commands
+            - 3443:3443
+            # SOAP service
+            # - 7878:7878
+        volumes:
+        - ./data:/server/
+        networks:
+            - trinity335db_network
+
+networks:
+    trinity335db_network:
+        # driver: bridge
+        name: trinity335
+        # External is true, already created with the DB container
+        external: true
