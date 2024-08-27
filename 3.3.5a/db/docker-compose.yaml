@@ -81,6 +81,7 @@ services:
                 # =============== 5. Set Administrator account for GM Console (remote)
                 echo -e "use \`auth\`\n" > /docker-entrypoint-initdb.d/05-insert-administrator.sql
                 echo "INSERT INTO \`account\` VALUES (1,'ADMINISTRATOR',0x171EAC0EB095508C3734D480C9048022F0600925344F112FF7256C2CA1FAEFA5,0x5AD77E43D5C0E3D60D193AB793DE5AE7BC0B771DB50670424996945F0AC35353,NULL,NULL,NULL,'','','2024-08-26 12:35:07','127.0.0.1','127.0.0.1',0,0,'00',NULL,0,2,0,'','',0,'',0,0);" >> /docker-entrypoint-initdb.d/05-insert-administrator.sql
+                echo "INSERT INTO \`account_access\` VALUES (1,4, -1);" >> /docker-entrypoint-initdb.d/05-insert-administrator.sql
 
                 # ============== Clean up
 
