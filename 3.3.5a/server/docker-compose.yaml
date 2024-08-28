@@ -16,7 +16,7 @@ services:
         build: .
         container_name: trinity335_worldserver
         image: trinity335_worldserver:6b42708
-        command: nohup ./worldserver
+        command: cd /repos/TrinityCore && git pull && cd /server/bin && nohup ./worldserver
         ports:
             # WorldServer port
             - 8085:8085
